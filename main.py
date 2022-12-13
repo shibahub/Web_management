@@ -7,10 +7,14 @@ from pysnmp.hlapi import *
 from icmp import icmp_value
 from system import system_value
 from ip import ip_value
-import passwd
 import mysql.connector
 import time 
+from datetime import datetime
+import passwd
+
+
 app = Flask(__name__)
+
 IR=[]
 IE=[]
 OR=[]
@@ -183,7 +187,7 @@ def ICMP():
     ip = Cookie.output().split('=')
     ip=ip[1]
     val = icmp_value(ip)
-    #cur_time=time.ctime()
+
     response_content =''
     response_content += """<HTML>
                         <style>
@@ -228,17 +232,35 @@ def ICMP():
             #sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
             #mycursor.execute(sql, (tmp2[1],tmp[1]))
         if "2.5.21.0" in i :
+            #############################################################################################################
             response_content+=f'<tr><td>ICMPOutEchos ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
             sql = "INSERT INTO Echo_icmp (ip, amount, date_time) VALUES (%s, %s, %s)"
-            cur_time= time.ctime()
-            mycursor.execute(sql, (ip,tmp[1],cur_time))  #### modify
+            #cur_time= time.ctime()
+            x = datetime.now()
+            x = x.strftime("%X")
+            mycursor.execute(sql, (ip,tmp[1],x))  #### modify
         if "2.5.22.0" in i :
             response_content+=f'<tr><td>ICMPOutEchosReps ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
             #sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
             #mycursor.execute(sql, (tmp2[1],tmp[1]))
     mycursor.execute('Select * from Echo_icmp;')
     result = mycursor.fetchall()
+
+    plot = []
+    icmp_out = []
+    plot.append("Time")
+    plot.append(result[0][0])
+    icmp_out.append(plot)
+    plot = []
+
     for i in result:
+        plot.append(i[2])
+        plot.append(int(i[1]))
+        icmp_out.append(plot)
+        plot = []
+    print(icmp_out)
+
+    '''for i in result:
         tmp = str(i).split("'")
         if "2.5.8.0" in tmp[1] :
             IE.append(tmp[3])
@@ -247,7 +269,7 @@ def ICMP():
         elif "2.5.21.0" in i :
             OE.append(tmp[3])
         elif "2.5.22.0" in i :
-            OR.append(tmp[3])  
+            OR.append(tmp[3])  '''
     ###plot garph###
     response_content+="</div>"
     response_content+="""<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -255,17 +277,13 @@ def ICMP():
                         google.charts.load('current', {'packages':['corechart']});
                         google.charts.setOnLoadCallback(drawChart);
 
-                        function drawChart() {
-                            var data = google.visualization.arrayToDataTable([
-                            ['Year', 'Sales', 'Expenses'],
-                            ['2004',  1000,      400],
-                            ['2005',  1170,      460],
-                            ['2006',  660,       1120],
-                            ['2007',  1030,      540]
-                            ]);
+                        function drawChart() {"""
+    response_content+=f"""var data = google.visualization.arrayToDataTable({icmp_out});"""
 
-                            var options = {
-                            title: 'Company Performance',
+    response_content+="""var options = {
+                            title: 'ICMP Out',
+                            hAxis: {title: 'icmp'},                           
+                            vAxis: {title: 'Time'},
                             curveType: 'function',
                             legend: { position: 'bottom' }
                             };
@@ -274,9 +292,9 @@ def ICMP():
 
                             chart.draw(data, options);
                         }
-                        </script>
-    """
-    response_content+=' <div id="curve_chart" style="width: 900px; height: 500px"></div>'
+                        </script>"""
+
+    response_content+=' <div id="curve_chart" style="width: 1500px; height: 500px"></div>'
     response_content+="</HTML>"
     return response_content
 
