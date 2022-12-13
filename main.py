@@ -9,7 +9,7 @@ from system import system_value
 from ip import ip_value
 import passwd
 import mysql.connector
-from http import cookies
+import time 
 app = Flask(__name__)
 IR=[]
 IE=[]
@@ -17,12 +17,17 @@ OR=[]
 OE=[]
 Cookie = cookies.SimpleCookie()
 Cookie['IP']='127.0.0.1'
+
+
+###### SQL CONNECTION #######
 mydb = mysql.connector.connect(
   host="localhost",
   user="root",
   password=passwd.x,
   database = 'net_man'
 )
+###### SQL CONNECTION #######
+
 @app.route('/setcookie',methods = ['POST', 'GET'])
 def setcookie():
     if request.method == 'POST':
@@ -36,7 +41,7 @@ def home():
                 <style>
                     body {background-color: #dddddd;}
                     h1   {color: Red;}
-                    p    {color: red;}
+                    p    {color: green;}
                 </style>
                 <H1>Network Management Web application Base</H1>
                 <form action = "/setcookie" method = "POST">
@@ -47,7 +52,7 @@ def home():
     ip = Cookie.output().split('=')
     ip=ip[1]
     #print(ip)
-    message+= f'<p>IP: {ip}</p>'
+    message+= f'<p>Current time: {time.ctime()}</p><p>Current IP: {ip}</p>'
     message+="""<h2>System Infomation</h2>
             <button type="button"><a href="/system">System</a></button>
             <h2>IP route table</h2>
@@ -145,7 +150,7 @@ def IP_table():
         if  "SNMPv2-SMI::mib-2.4.21.1.1." in  i:
             tmp = i.split(' = ')
             #print(tmp[1])
-            Des.append(tmp[1])
+            Nex.append(tmp[1])
         if  "SNMPv2-SMI::mib-2.4.21.1.2." in  i:
             tmp = i.split(' = ')
             #print(tmp[1])
@@ -153,7 +158,7 @@ def IP_table():
         if  "SNMPv2-SMI::mib-2.4.21.1.7." in  i:
             tmp = i.split(' = ')
             #print(tmp[1])
-            Nex.append(tmp[1])
+            Des.append(tmp[1])
         if  "SNMPv2-SMI::mib-2.4.21.1.8." in  i:
             tmp = i.split(' = ')
             #print(tmp[1])
@@ -215,20 +220,20 @@ def ICMP():
         tmp2 = tmp[0].split('SNMPv2-SMI::mib-')
         if "2.5.8.0" in i :
             response_content+=f'<tr><td>ICMPInEchos ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
-            sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
-            mycursor.execute(sql, (tmp2[1],tmp[1]))
+            #sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
+            #mycursor.execute(sql, (tmp2[1],tmp[1]))
         if "2.5.9.0" in i :
             response_content+=f'<tr><td>ICMPInEchosReps ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
-            sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
-            mycursor.execute(sql, (tmp2[1],tmp[1]))
+            #sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
+            #mycursor.execute(sql, (tmp2[1],tmp[1]))
         if "2.5.21.0" in i :
             response_content+=f'<tr><td>ICMPOutEchos ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
-            sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
-            mycursor.execute(sql, (tmp2[1],tmp[1]))
+            sql = "INSERT INTO Echo_icmp (ip, amount, date_time) VALUES (%s, %s)"
+            mycursor.execute(sql, (ip,tmp[1]))  #### modify
         if "2.5.22.0" in i :
             response_content+=f'<tr><td>ICMPOutEchosReps ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
-            sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
-            mycursor.execute(sql, (tmp2[1],tmp[1]))
+            #sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
+            #mycursor.execute(sql, (tmp2[1],tmp[1]))
     mycursor.execute('Select * from Echo_icmp;')
     result = mycursor.fetchall()
     for i in result:
@@ -242,44 +247,6 @@ def ICMP():
         elif "2.5.22.0" in i :
             OR.append(tmp[3])
         time=[]
-        """for i in range(0,len(IE)):
-            time.append(i)
-            response_content+="</div>"
-            response_content+='<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script>\
-                    <canvas id="myChart" style="width:100%;max-width:600px"></canvas>\
-                    <script>\
-                    var xValues = [1,2,3,4,5,6,7,8,9,10];\
-                    new Chart("myChart", {\
-                    type: "line",\
-                    data: {\
-                        labels: xValues,\
-                        datasets: [{ \
-                        data: '+str(IE)+',\
-                        borderColor: "red",\
-                        fill: false\
-                        }, { \
-                        data: '+str(IR)+',\
-                        borderColor: "blue",\
-                        fill: false\
-                        }, { \
-                        }, { \
-                        data: '+str(OE)+',\
-                        borderColor: "green",\
-                        fill: false\
-                        }, { \
-                        data: '+str(OR)+',\
-                        borderColor: "black",\
-                        fill: false\
-                        }]\
-                    },'
-                   
-            response_content+="options: {\
-                legend: {display: true,\
-   			    }\
-                }\
-                });\
-                </script>\
-            """
         response_content+="</HTML>"
     return response_content
 
