@@ -1,6 +1,7 @@
-
 from email import message
 from http import cookies
+from operator import sub
+from re import X
 from flask import Flask, redirect, url_for,request
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 from pysnmp.hlapi import *
@@ -9,6 +10,7 @@ from system import system_value
 from ip import ip_value
 import mysql.connector
 import time 
+import passwd
 from datetime import datetime
 
 #126 ber p net man
@@ -27,7 +29,7 @@ tmp_ip='127.0.0.1'
 mydb = mysql.connector.connect(
   host="localhost",
   user="root",
-  password="",
+  password=passwd.x,
   database = 'net_man'
 )
 ###### SQL CONNECTION #######
@@ -84,6 +86,7 @@ def system():
                             <style>
                                 body {background-color: white;}
                                 h1   {color: Black;}
+                                p {color: green;}
                                 table {
                                     font-family: arial, sans-serif;
                                     border-collapse: collapse;
@@ -102,6 +105,7 @@ def system():
                                 }
                             </style>
                             <h1>System information</h1>"""
+    response_content+=f'<p>IP: {ip}</p>'
     response_content+=f"<Table> <tr>\
                             <th>Info.</th>\
                             <th>Description</th><tr>"
@@ -109,6 +113,14 @@ def system():
                     tmp = i.split(' = ')
                     tmp2 = tmp[0].split('SNMPv2-MIB::')
                     response_content+=f'<tr><td>{tmp2[1]}</td><td>{tmp[1]}</td></tr>'
+                    #store in DB
+                    mycursor = mydb.cursor()
+                    mycursor.execute('USE net_man;')
+                    sql = "INSERT INTO System_info (ip, OID, INFO, times) VALUES (%s, %s, %s, %s)"
+                    times = time.ctime()
+                    mycursor.execute(sql, (ip,tmp2[1], tmp[1], times))  #### modify
+                    mydb.commit()
+                    #mycursor.execute('Select * from Icmp;')
     response_content+="</HTML>"
     # END SNMP
     return response_content
@@ -124,13 +136,12 @@ def IP_table():
                                             <style>
                                                 body {background-color: white;}
                                                 h1   {color: Black;}
-                                                p    {color: red;}
+                                                p    {color: green;}
                                                 table {
                                                     font-family: arial, sans-serif;
                                                     border-collapse: collapse;
                                                     width: 100%;
                                                     }
-
                                                 td, th {
                                                     border: 1px solid #dddddd;
                                                     text-align: left;
@@ -141,6 +152,7 @@ def IP_table():
                                                     }
                                             </style>
                                     <H1>IP ROUTE TABLE</H1>"""
+    response_content+=f'<p>IP: {ip}</p>'
     response_content +='<table>\
                     <tr><th>Next hop</th>\
                     <th>Interface</th>\
@@ -184,6 +196,14 @@ def IP_table():
             #tmp= i.split(' = ')
     for i in range (len(Des)):
         response_content += f'<tr><td>{Des[i]}</td><td>{Int[i]}</td><td>{Nex[i]}</td><td>{Typ[i]}</td><td>{Pro[i]}</td><td>{Bro[i]}</td></tr>'                       
+        #store in DB
+        mycursor = mydb.cursor()
+        mycursor.execute('USE net_man;')
+        sql = "INSERT INTO IP_table (ip, nexthop, destination, subnet, times) VALUES (%s, %s, %s, %s, %s)"
+        times = time.ctime()
+        mycursor.execute(sql, (ip, Nex[i], Des[i], Bro[i], times))  #### modify
+        mydb.commit()
+        #mycursor.execute('Select * from Icmp;')
     response_content +='</table></HTML>'
     return response_content
 
@@ -213,6 +233,7 @@ def ICMP():
                         <style>
                             body {background-color: white;}
                             h1   {color: Black;}
+                            p {color: green;}
                             table {
                                 font-family: arial, sans-serif;
                                 border-collapse: collapse;
@@ -231,6 +252,7 @@ def ICMP():
                             }
                         </style>
                         <h1>ICMP Echo</h1>"""
+    response_content+=f'<p>IP: {ip}</p>'
     response_content+=f"<Table> <tr>\
                     <th>Info.</th>\
                     <th>count</th><tr>"
@@ -242,9 +264,10 @@ def ICMP():
     mycursor.execute('USE net_man;')
     #############################################################################################################
     sql = "INSERT INTO Icmp (ip, icmp_in, icmp_in_rep, icmp_out, icmp_out_rep, times) VALUES (%s, %s, %s, %s, %s, %s)"
-    x = datetime.now()
-    x = x.strftime("%X")
+    x = time.ctime()
+    #x = x.strftime("%X")
     mycursor.execute(sql, (ip,icmp_In_Echo, icmp_In_Echo_Rep, icmp_Out_Echo, icmp_Out_Echo_Rep, x))  #### modify
+    mydb.commit()
     mycursor.execute('Select * from Icmp;')
     result = mycursor.fetchall()
     
@@ -274,25 +297,22 @@ def ICMP():
 
     ###plot garph###
     response_content+="</div>"
-    response_content+="""<meta http-equiv="refresh" content="10">
+    response_content+="""<meta http-equiv="refresh" content="15">
                         <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
                         <script type="text/javascript">
                         google.charts.load('current', {'packages':['corechart']});
                         google.charts.setOnLoadCallback(drawChart);
-
                         function drawChart() {"""
     response_content+=f"""var data = google.visualization.arrayToDataTable({icmp_out});"""
 
     response_content+="""var options = {
-                            title: 'ICMP Out',
+                            title: 'ICMP Chart',
                             hAxis: {title: 'icmp'},                           
                             vAxis: {title: 'Time'},
                             curveType: 'function',
                             legend: { position: 'bottom' }
                             };
-
                             var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
-
                             chart.draw(data, options);
                         }
                         </script>"""
