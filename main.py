@@ -1,6 +1,7 @@
-
 from email import message
 from http import cookies
+from operator import sub
+from re import X
 from flask import Flask, redirect, url_for,request
 from pysnmp.entity.rfc3413.oneliner import cmdgen
 from pysnmp.hlapi import *
@@ -9,10 +10,10 @@ from system import system_value
 from ip import ip_value
 import mysql.connector
 import time 
-from datetime import datetime
 import passwd
+from datetime import datetime
 
-
+#126 ber p net man
 app = Flask(__name__)
 
 IR=[]
@@ -22,7 +23,8 @@ OE=[]
 Cookie = cookies.SimpleCookie()
 Cookie['IP']='127.0.0.1'
 
-
+count =1
+tmp_ip='127.0.0.1'
 ###### SQL CONNECTION #######
 mydb = mysql.connector.connect(
   host="localhost",
@@ -56,6 +58,11 @@ def home():
     ip = Cookie.output().split('=')
     ip=ip[1]
     #print(ip)
+    global tmp_ip
+    global count
+    if ip != tmp_ip:
+        count+=1
+        tmp_ip=ip
     message+= f'<p>Current time: {time.ctime()}</p><p>Current IP: {ip}</p>'
     message+="""<h2>System Infomation</h2>
             <button type="button"><a href="/system">System</a></button>
@@ -79,6 +86,7 @@ def system():
                             <style>
                                 body {background-color: white;}
                                 h1   {color: Black;}
+                                p {color: green;}
                                 table {
                                     font-family: arial, sans-serif;
                                     border-collapse: collapse;
@@ -97,6 +105,7 @@ def system():
                                 }
                             </style>
                             <h1>System information</h1>"""
+    response_content+=f'<p>IP: {ip}</p>'
     response_content+=f"<Table> <tr>\
                             <th>Info.</th>\
                             <th>Description</th><tr>"
@@ -104,6 +113,14 @@ def system():
                     tmp = i.split(' = ')
                     tmp2 = tmp[0].split('SNMPv2-MIB::')
                     response_content+=f'<tr><td>{tmp2[1]}</td><td>{tmp[1]}</td></tr>'
+                    #store in DB
+                    mycursor = mydb.cursor()
+                    mycursor.execute('USE net_man;')
+                    sql = "INSERT INTO System_info (ip, OID, INFO, times) VALUES (%s, %s, %s, %s)"
+                    times = time.ctime()
+                    mycursor.execute(sql, (ip,tmp2[1], tmp[1], times))  #### modify
+                    mydb.commit()
+                    #mycursor.execute('Select * from Icmp;')
     response_content+="</HTML>"
     # END SNMP
     return response_content
@@ -119,13 +136,12 @@ def IP_table():
                                             <style>
                                                 body {background-color: white;}
                                                 h1   {color: Black;}
-                                                p    {color: red;}
+                                                p    {color: green;}
                                                 table {
                                                     font-family: arial, sans-serif;
                                                     border-collapse: collapse;
                                                     width: 100%;
                                                     }
-
                                                 td, th {
                                                     border: 1px solid #dddddd;
                                                     text-align: left;
@@ -136,10 +152,11 @@ def IP_table():
                                                     }
                                             </style>
                                     <H1>IP ROUTE TABLE</H1>"""
+    response_content+=f'<p>IP: {ip}</p>'
     response_content +='<table>\
-                    <tr><th>Destination</th>\
+                    <tr><th>Next hop</th>\
                     <th>Interface</th>\
-                    <th>Next hop</th>\
+                    <th>Destination</th>\
                     <th>Routing types</th>\
                     <th>Routing Protocol</th>\
                     <th>Subnet mask</th></tr>'
@@ -149,12 +166,13 @@ def IP_table():
     Typ=[] # type 
     Pro=[] # protocol
     Bro=[] # Broad cast
+
     for i in val:
         test=i.split(' = ')
         if  "SNMPv2-SMI::mib-2.4.21.1.1." in  i:
             tmp = i.split(' = ')
             #print(tmp[1])
-            Nex.append(tmp[1])
+            Des.append(tmp[1])
         if  "SNMPv2-SMI::mib-2.4.21.1.2." in  i:
             tmp = i.split(' = ')
             #print(tmp[1])
@@ -162,7 +180,7 @@ def IP_table():
         if  "SNMPv2-SMI::mib-2.4.21.1.7." in  i:
             tmp = i.split(' = ')
             #print(tmp[1])
-            Des.append(tmp[1])
+            Nex.append(tmp[1])
         if  "SNMPv2-SMI::mib-2.4.21.1.8." in  i:
             tmp = i.split(' = ')
             #print(tmp[1])
@@ -178,6 +196,14 @@ def IP_table():
             #tmp= i.split(' = ')
     for i in range (len(Des)):
         response_content += f'<tr><td>{Des[i]}</td><td>{Int[i]}</td><td>{Nex[i]}</td><td>{Typ[i]}</td><td>{Pro[i]}</td><td>{Bro[i]}</td></tr>'                       
+        #store in DB
+        mycursor = mydb.cursor()
+        mycursor.execute('USE net_man;')
+        sql = "INSERT INTO IP_table (ip, nexthop, destination, subnet, times) VALUES (%s, %s, %s, %s, %s)"
+        times = time.ctime()
+        mycursor.execute(sql, (ip, Nex[i], Des[i], Bro[i], times))  #### modify
+        mydb.commit()
+        #mycursor.execute('Select * from Icmp;')
     response_content +='</table></HTML>'
     return response_content
 
@@ -188,11 +214,26 @@ def ICMP():
     ip=ip[1]
     val = icmp_value(ip)
 
+    icmp_In_Echo = val[0].split('=')
+    icmp_In_Echo = (icmp_In_Echo[1])
+
+    icmp_In_Echo_Rep = val[1].split(' =')
+    icmp_In_Echo_Rep = (icmp_In_Echo_Rep[1])
+
+    icmp_Out_Echo = val[2].split(' =')
+    icmp_Out_Echo = (icmp_Out_Echo[1])
+
+    icmp_Out_Echo_Rep = val[3].split(' =')
+    icmp_Out_Echo_Rep = (icmp_Out_Echo_Rep[1])
+
+    
+
     response_content =''
     response_content += """<HTML>
                         <style>
                             body {background-color: white;}
                             h1   {color: Black;}
+                            p {color: green;}
                             table {
                                 font-family: arial, sans-serif;
                                 border-collapse: collapse;
@@ -211,6 +252,7 @@ def ICMP():
                             }
                         </style>
                         <h1>ICMP Echo</h1>"""
+    response_content+=f'<p>IP: {ip}</p>'
     response_content+=f"<Table> <tr>\
                     <th>Info.</th>\
                     <th>count</th><tr>"
@@ -220,82 +262,64 @@ def ICMP():
     global OR
     mycursor = mydb.cursor()
     mycursor.execute('USE net_man;')
-    for i in val:
-        tmp = i.split(' = ')
-        tmp2 = tmp[0].split('SNMPv2-SMI::mib-')
-        if "2.5.8.0" in i :
-            response_content+=f'<tr><td>ICMPInEchos ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
-            #sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
-            #mycursor.execute(sql, (tmp2[1],tmp[1]))
-        if "2.5.9.0" in i :
-            response_content+=f'<tr><td>ICMPInEchosReps ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
-            #sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
-            #mycursor.execute(sql, (tmp2[1],tmp[1]))
-        if "2.5.21.0" in i :
-            #############################################################################################################
-            response_content+=f'<tr><td>ICMPOutEchos ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
-            sql = "INSERT INTO Echo_icmp (ip, amount, date_time) VALUES (%s, %s, %s)"
-            #cur_time= time.ctime()
-            x = datetime.now()
-            x = x.strftime("%X")
-            mycursor.execute(sql, (ip,tmp[1],x))  #### modify
-        if "2.5.22.0" in i :
-            response_content+=f'<tr><td>ICMPOutEchosReps ({tmp2[1]})</td><td>{tmp[1]}</td></tr>'
-            #sql = "INSERT INTO Echo_icmp (name, amount) VALUES (%s, %s)"
-            #mycursor.execute(sql, (tmp2[1],tmp[1]))
-    mycursor.execute('Select * from Echo_icmp;')
+    #############################################################################################################
+    sql = "INSERT INTO Icmp (ip, icmp_in, icmp_in_rep, icmp_out, icmp_out_rep, times) VALUES (%s, %s, %s, %s, %s, %s)"
+    x = time.ctime()
+    #x = x.strftime("%X")
+    mycursor.execute(sql, (ip,icmp_In_Echo, icmp_In_Echo_Rep, icmp_Out_Echo, icmp_Out_Echo_Rep, x))  #### modify
+    mydb.commit()
+    mycursor.execute('Select * from Icmp;')
     result = mycursor.fetchall()
-
+    
     plot = []
     icmp_out = []
     plot.append("Time")
-    plot.append(result[0][0])
+    plot.append("ICMP_In_Echo")
+    plot.append("ICMP_In_Echo_Rep")
+    plot.append("ICMP_Out_Echo")
+    plot.append("ICMP_Out_Echo_Rep")
     icmp_out.append(plot)
     plot = []
 
     for i in result:
-        plot.append(i[2])
+        plot.append(i[5])
         plot.append(int(i[1]))
+        plot.append(int(i[2]))
+        plot.append(int(i[3]))
+        plot.append(int(i[4]))
         icmp_out.append(plot)
         plot = []
-    print(icmp_out)
 
-    '''for i in result:
-        tmp = str(i).split("'")
-        if "2.5.8.0" in tmp[1] :
-            IE.append(tmp[3])
-        elif "2.5.9.0" in i :
-            IR.append(tmp[3])
-        elif "2.5.21.0" in i :
-            OE.append(tmp[3])
-        elif "2.5.22.0" in i :
-            OR.append(tmp[3])  '''
+    response_content+=f'<tr><td>ICMP In Echo (2.5.8.0)</td><td>{icmp_In_Echo}</td></tr>'
+    response_content+=f'<tr><td>ICMP In Echo Rep (2.5.9.0)</td><td>{icmp_In_Echo_Rep}</td></tr>'
+    response_content+=f'<tr><td>ICMP Out Echo (2.5.21.0)</td><td>{icmp_Out_Echo}</td></tr>'
+    response_content+=f'<tr><td>ICMP Out Echo Rep (2.5.22.0)</td><td>{icmp_Out_Echo_Rep}</td></tr>'
+
     ###plot garph###
     response_content+="</div>"
-    response_content+="""<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    response_content+="""<meta http-equiv="refresh" content="15">
+                        <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
                         <script type="text/javascript">
                         google.charts.load('current', {'packages':['corechart']});
                         google.charts.setOnLoadCallback(drawChart);
-
                         function drawChart() {"""
     response_content+=f"""var data = google.visualization.arrayToDataTable({icmp_out});"""
 
     response_content+="""var options = {
-                            title: 'ICMP Out',
+                            title: 'ICMP Chart',
                             hAxis: {title: 'icmp'},                           
                             vAxis: {title: 'Time'},
                             curveType: 'function',
                             legend: { position: 'bottom' }
                             };
-
                             var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
-
                             chart.draw(data, options);
                         }
                         </script>"""
 
     response_content+=' <div id="curve_chart" style="width: 1500px; height: 500px"></div>'
     response_content+="</HTML>"
+    #print(response_content)
     return response_content
 
 
