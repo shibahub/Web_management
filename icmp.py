@@ -5,7 +5,7 @@ def icmp_value(ip):
     print(f'icmp request IP: {ip}')
     errorIndication, errorStatus, errorIndex, varBinds = next(
         getCmd(SnmpEngine(),
-            CommunityData('public'),
+            CommunityData('management'),
             UdpTransportTarget((ip, 161)),
             ContextData(),
             #icmpInEchos
@@ -30,3 +30,5 @@ def icmp_value(ip):
 
             result.append(str(varBind))
     return result
+
+#icmp_value('192.168.200.2')
