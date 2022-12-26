@@ -4,7 +4,7 @@ def ip_value(ip):
     result=[]
     errorIndication, errorStatus, errorIndex, \
     varBindTable = cmdgen.CommandGenerator().bulkCmd(  
-                cmdgen.CommunityData('test-agent', 'public'),  
+                cmdgen.CommunityData('management'),  
                 cmdgen.UdpTransportTarget((ip, 161)),  
                 0, 
                 25, 
@@ -13,10 +13,10 @@ def ip_value(ip):
             )
 
     if errorIndication:
-        print('1')
+        print(errorIndication)
     else:
         if errorStatus:
-            print ('2')
+            print (errorStatus)
                 
         else:
             for varBindTableRow in varBindTable:
@@ -26,4 +26,4 @@ def ip_value(ip):
                     result.append(tmp)
     return result
 
-#ip_value('127.0.0.1')
+#ip_value('192.168.2.1')
